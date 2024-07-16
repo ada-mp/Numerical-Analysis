@@ -1,0 +1,467 @@
+\documentclass[12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[brazil]{babel}
+\usepackage{graphicx}
+%\usepackage{hyperref}
+\usepackage{natbib}
+\usepackage{url}
+\usepackage{multicol}
+\usepackage{multirow}
+\usepackage{amsmath}
+\usepackage{float}
+\usepackage{hyperref}
+\usepackage{caption} % Pacote para manipulação avançada de legendas
+\usepackage{amssymb}
+\usepackage{mathalpha}
+
+
+% Configurações de Margem
+\usepackage[top=3cm, bottom=2cm, left=3cm, right=2cm]{geometry}
+
+% O tamanho do parágrafo é dado por:
+\setlength{\parindent}{1.25cm}
+
+% Controle do espaçamento entre um parágrafo e outro:
+\setlength{\parskip}{0.2cm}
+
+% Espaçamento entre linhas
+\renewcommand{\baselinestretch}{1.5} % Espaçamento 1.5
+
+
+
+\title{Agrupamento multivariado do Old Faithful com modelos de mistura gaussiana}
+\author{{Ada Maris Pereira Mário}\\
+Instituto de Ciências Matemáticas e de Computação\\ Universidade de São Paulo
+}
+
+\date{\today}
+
+\begin{document}
+\maketitle
+
+
+\section{Introdução}
+
+\
+
+Modelos com mistura de distribuições são modelos probabilísticos usados para representar subpopulações dentro de uma população maior. São amplamente utilizados para modelar dados complexos, em que a assunção de uma só distribuição não é suficiente para modelar a heterogeneidade do conjunto \citep{mclachlan2000finite}. Têm aplicações bem-sucedidas em áreas como agricultura, astronomia, bioinformática, biologia, economia, engenharia, genética, medicina, neurociência, psiquiatria e psicologia, especialmente devido seu aproveitamento na tarefa de agrupar os dados \citep{mclachlan1988mixture}.
+
+Modelos de mistura tipicamente representam dados não-normais como uma combinação de distribuições normais, os chamados modelos de mistura de gaussianas, ou GMM (Gaussian Mixture Model) \citep{prince2021analytic}. Esses são modelos estocásticos representados como uma soma ponderada de densidades normais. Em geral, seus parâmetros são estimados utilizando o algoritmo \textit{expectation-maximization} (EM) \citep{reynolds2009gaussian}. Tais modelos, em particular, são usados com dois propósitos principais: fornecer uma estrutura semiparamétrica "agradável" para modelar formas distribucionais desconhecidas e  fornecer um agrupamento probabilístico dos dados em uma certa quantidade de clusters correspondentes aos componentes no modelo de mistura \citep{mclachlan2014number}.
+
+Neste projeto, será utilizado o conjunto de dados "Old Faithful Geyser Data", do gêiser Old Faithful no Yellowstone National Park, Wyoming, EUA, disponível no \texttt{R}  \citep{faithful}. Este conjunto de dados contém observações sobre a duração das erupções e o tempo de espera entre as erupções do gêiser Old Faithful \cite{azzalini1990look}. Nesse sentido, o intuito dessa análise é identificar subpopulações dentro do conjunto. Para isso, será utilizado o GMM, com a estimação de seus parâmetros pelo algoritmo EM, de modo a ajustar modelos de mistura de distribuições às observações. Assim, serão analisados o ajuste final, as distribuições identificadas e a convergência do algoritmo.
+
+
+\section{Metodologia}
+
+\subsection{Conjunto de Dados}
+
+\
+
+O conjunto de dados "Old Faithful Geyser Data"{} consiste em 272 observações da duração das erupções e do tempo de espera entre as erupções do gêiser Old Faithful no Yellowstone National Park, Wyoming, EUA. Este conjunto de dados é amplamente utilizado em estatística e aprendizado de máquina para demonstração de técnicas de análise de dados. As duas variáveis contidas no conjunto são:
+\begin{itemize}
+    \item \textbf{eruptions:} Duração das erupções (em minutos).
+    \item \textbf{waiting:} Tempo de espera até a próxima erupção (em minutos).
+\end{itemize}
+
+Esses dados são particularmente adequados para a aplicação de modelos de mistura de gaussianas (GMM), pois exibem uma estrutura multimodal que pode ser modelada como uma mistura de distribuições normais. A identificação de subpopulações dentro desses dados pode auxiliar no estudo de diferentes padrões de erupção.
+
+
+\subsection{Modelos de Mistura de gaussianas (GMMs)}
+
+\
+
+Um modelo de mistura de gaussianas é uma soma ponderada das $M$ densidades gaussianas componentes, conforme dado pela equação
+
+\begin{equation}
+p(\mathbf{x}|\lambda) = \sum_{i=1}^{M} w_i \cdot g(\mathbf{x}|\mathbf{\mu}_i, \mathbf{\Sigma}_i),
+\end{equation}
+em que $x$ é um vetor de dados contínuos $D$-dimensional, $w_i, i = 1, \ldots, M$, são os pesos de cada componente, e $g(\mathbf{x}|\mathbf{\mu}_i, \mathbf{\Sigma}_i)$ são as densidades gaussianas componentes. Cada densidade componente é uma função gaussiana $D$-variada da forma
+
+\begin{equation}
+g(\mathbf{x}|\mathbf{\mu}_i, \mathbf{\Sigma}_i) = \frac{1}{(2\pi)^{D/2}|\Sigma_i|^{1/2}} \exp\left(-\frac{1}{2}(\mathbf{x}-\mathbf{\mu}_i)'\Sigma_i^{-1}(\mathbf{x}-\mathbf{\mu}_i)\right),
+\end{equation}
+com vetor de médias $\mathbf{\mu}_i$ e matriz de covariância $\mathbf{\Sigma}_i$. Os pesos das misturas satisfazem a restrição $\sum_{i=1}^{M} w_i = 1$.
+
+O GMM completo é parametrizado pelos vetores de médias, matrizes de covariância e pesos de mistura de todas as densidades componentes. Esses parâmetros são representados coletivamente pela notação
+
+\begin{equation}
+\lambda = \{w_i, \mathbf{\mu}_i, \Sigma_i\}, \quad i = 1, \ldots, M.
+\end{equation}
+
+No contexto de aprendizado não-supervisionado, o uso do GMM para \textit{clustering} pode ser interpretado como tendo-se $M$ \textit{clusters} totais no conjunto de dados. Desse modo, os parâmetros de cada cluster $m \in \{1, \ldots, M\}$ podem ser observados da seguinte maneira:
+
+\begin{itemize}
+    \item A média $\mu_m$ define o centro do cluster;
+    \item A covariância $\Sigma_m$ define sua largura. Isto seria equivalente às dimensões de um elipsóide num cenário multivariado;
+    \item A probabilidade de mistura $w_m$ define quão grande ou pequena será a função gaussiana.
+\end{itemize}
+
+De forma ilustrada:
+
+\begin{figure}[H]
+    \centering
+    \caption{Ilustração da correspondência entre gaussianas e seus respectivos \textit{clusters}}
+    \includegraphics[width=0.4\textwidth]{cluster parameters.jpg}
+    \caption*{Fonte: \cite{carrascoweb}}\label{fig1}
+\end{figure}
+
+Na figura \ref{fig1} pode-se observar que há 3 funções gaussianas — logo, $M = 3$ —, em que cada uma explica os dados dos respectivos \textit{clusters} a elas designados. Nesse sentido, surge o problema da estimação dos valores que corresponderiam aos parâmetros de cada uma dessas distribuições que mais otimizam a explicação dos dados e suas divisões.
+
+Este é o papel da máxima verossimilhança. Dado $T$ vetores de treinamento $X = \{x_1, \ldots, x_T\}$ com uma suposta configuração GMM, deseja-se estimar $\lambda$ que melhor corresponde às distribuições de $X$. Assim, supondo independência entre os vetores, a verossimilhança da GMM pode ser escrita como:
+
+\begin{equation} \label{mlgmm}
+p(X|\lambda) = \prod_{t=1}^{T} p(x_t|\lambda)
+\end{equation}
+
+Entretanto, por ser um problema com não apenas uma, mas várias gaussianas, (\ref{mlgmm}) será uma função não-linear e a maximização direta não é possível. É aqui que entra o algoritmo EM.
+
+
+\subsection{Algoritmo EM}
+\
+O algoritmo EM (Expectation-Maximization) é um método iterativo particularmente útil em estimação por máxima verossimilhança ou para obter a moda a posteriori quando o modelo depende de variáveis não observáveis chamadas variáveis latentes. O algoritmo itera entre duas etapas principais:
+
+\begin{itemize}
+    \item \textbf{Etapa E (Expectation):} Calcula a expectativa da função de log-verossimilhança completa, condicionada aos valores dos parâmetros calculados na iteração anterior.
+    \item \textbf{Etapa M (Maximization):} Maximiza a função de log-verossimilhança completa para atualizar os parâmetros.
+\end{itemize}
+
+Os passos do algoritmo EM são detalhados a seguir:
+
+\begin{enumerate}
+    \item \textbf{Inicialização:} Inicialize os parâmetros $\lambda = \{w_i, \mathbf{\mu}_i, \Sigma_i\}$.
+    \item \textbf{Etapa E:} Calcule a probabilidade posteriori de que cada ponto de dados $x_t$ pertença ao componente $i$:
+    \begin{equation}
+    \gamma_{i}(x_t) = \frac{w_i g(x_t|\mathbf{\mu}_i, \Sigma_i)}{\sum_{j=1}^{M} w_j g(x_t|\mathbf{\mu}_j, \Sigma_j)}
+    \end{equation}
+    \item \textbf{Etapa M:} Atualize os parâmetros usando as responsabilidades calculadas:
+    \begin{align}
+    w_i &= \frac{1}{T} \sum_{t=1}^{T} \gamma_{i}(x_t) \\
+    \mathbf{\mu}_i &= \frac{\sum_{t=1}^{T} \gamma_{i}(x_t) x_t}{\sum_{t=1}^{T} \gamma_{i}(x_t)} \\
+    \Sigma_i &= \frac{\sum_{t=1}^{T} \gamma_{i}(x_t) (x_t - \mathbf{\mu}_i)(x_t - \mathbf{\mu}_i)^T}{\sum_{t=1}^{T} \gamma_{i}(x_t)}
+    \end{align}
+    \item \textbf{Convergência:} Verifique se a mudança na verossimilhança é menor que um limiar predefinido (ou seja, verificar se a verossimilhança é máxima) ou se um número máximo de iterações foi alcançado.
+\end{enumerate}
+
+\subsection{Implementação no \texttt{R}}
+
+\
+
+Os dados aqui utilizados são públicos e estão disponíveis no \texttt{R} sob o nome de \texttt{"faithful"}. Inicialmente, foi realizada uma análise exploratória de dados com as ferramentas comuns do \texttt{R}, bem como a identificação de outliers por boxplots e uma função implementada para amplitude interquartil e limites superior e inferior (\ref{IQR}).
+
+\begin{equation} \label{IQR}
+    \begin{split}
+        & IIQ = Q_3 - Q_1 \\
+        & LI = Q_1 - 1.5 \cdot IIQ \\
+        & LS = Q_3 + 1.5 \cdot IIQ
+    \end{split}
+\end{equation}
+
+Para implementar o GMM e o algoritmo EM, foi utilizado o pacote \texttt{mclust} no R. Este pacote fornece funções para \textit{clustering} baseado em modelos de mistura gaussiana finitos parametrizados. Os modelos são estimados pelo algoritmo EM inicializado por \textit{clustering} aglomerativo baseado em modelo hierárquico. O modelo ideal é então selecionado de acordo com o BIC.
+
+Utilizando funções de plotagem da linguagem e do pacote utilizado, são visualizados o ajuste do modelo, a convergência do algoritmo EM e os \textit{clusters} resultantes. Também foram analisados os parâmetros estimados obtidos e as probabilidades posteriori de cada ponto pertencer a cada cluster
+
+Para avaliar a qualidade do ajuste do modelo, utilizaram-se critérios de seleção de modelos como o Critério de Informação Bayesiano (BIC) — equação \ref{BIC}, em que $\hat{L}$ é a estimativa de máxima verossimilhança, $k$ o número de parâmetros estimados e $n$ o número de pontos. Este critério penaliza a complexidade do modelo para evitar o sobreajuste. Em geral, quanto menor seu valor, melhor. No entanto, a biblioteca \texttt{mclust} computa este valor com a equação \ref{BIC} com sinais opostos, escolhendo o maior valor, que corresponde ao menor valor em módulo \citep{scrucca2016mclust}.
+
+\begin{equation} \label{BIC}
+    BIC = k \ln(n) -2\ln(\hat{L})
+\end{equation}
+
+Porém, o BIC tende a selecionar o número de componentes da mistura necessários para aproximar razoavelmente a densidade, e não o número de clusters como tal. Por esta razão, utilizou-se, também, o Critério de Verossimilhança de Dados Completos Integrados (ICL):
+
+\begin{equation}\label{ICL}
+    ICL_{M,G} = BIC_{M,G} - 2 \sum_{i=1}^{n} \sum_{g=1}^{G} c_{i,g} \ln(z_{i,g}),
+\end{equation}
+onde $M$ é o modelo com $G$ componentes, $c_{i,g}$ é uma constante que assume valores 1 se a observação $i$ pertence ao grupo $g$ e 0 caso contrário, e $z_{i,g}$ é a probabilidade condicional da observação $i$ pertencer ao grupo $g$.
+
+Ademais, utilizou-se o índice de silhueta (\ref{silhouette}), que mede a coesão e separação dos clusters.
+
+\begin{equation}
+    s(i) = \frac{b(i) - a(i)}{\max{a(i), b(i)}}\label{silhouette}
+\end{equation}
+
+\section{Resultados}
+
+\subsection{Análise dos Dados}
+
+\
+
+Primeiramente, os dados foram carregados e analisados, de modo a detectar possíveis padrões que influenciariam no ajuste do modelo. A seguir, apresenta-se um exemplo das 6 primeiras linhas do conjunto e uma tabela sumarizando algumas estatísticas descritivas:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{cc}
+\hline
+\textit{Erupções (min)} & \textit{Espera (min)} \\
+\hline
+3.600 & 79 \\
+1.800 & 54 \\
+3.333 & 74 \\
+2.283 & 62 \\
+4.533 & 85 \\
+2.883 & 55 \\
+\hline
+\end{tabular}
+\caption{Dataframe das 6 primeiras linhas do \textit{dataset}}
+\end{table}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{ccc}
+\hline
+\textit{Estatística} & \textit{Erupções (min)} & \textit{Espera (min)} \\
+\hline
+Média & 3.487783 & 70.89706 \\
+Desvio Padrão & 1.141371 & 13.59497 \\
+Mínimo & 1.6 & 43 \\
+Máximo & 5.1 & 96 \\
+\hline
+\end{tabular}
+\caption{Estatísticas descritivas do \textit{dataset}}
+\end{table}
+
+Conhecido por suas erupções regulares e previsíveis, é possível notar pelas linhas iniciais um padrão de cerca de $3.5 min$ por erupção, refletido em sua média, bem como um tempo de espera girando em torno da casa dos $70 min$. Ademais, vê-se uma suposta relação proporcional entre o tempo de espera e a duração da erupção. Isso pode ser melhor visualizado em um gráfico de dispersão:
+
+\begin{figure}[H]
+    \centering
+    \caption{Gráfico de dispersão da duração das erupções por tempo de espera}
+    \includegraphics[width=0.5\textwidth]{scatter plot.png}
+    \caption*{Fonte: Autoria própria}\label{scatter}
+\end{figure}
+
+De fato, pela figura \ref{scatter}, há uma relação positiva entre as duas covariáveis do conjunto, indicando que quanto maior o tempo de espera, mais duradoura será a próxima erupção. Isso é refletido no coeficiente de correlação de Pearson encontrado, $\rho \approx 0.9$.
+
+Além disso, pode-se analisar os histogramas das covariáveis para identificar possíveis \textit{clusters}:
+
+\begin{figure}[H]
+    \centering
+    \begin{minipage}{0.45\textwidth}
+        \centering
+        \caption{\centering{Histograma da duração das erupções}}\label{fig:hist erupt}
+        \includegraphics[width=\textwidth]{hist eruptions.png}
+        \caption*{Fonte: Autoria própria}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.45\textwidth}
+        \centering
+        \caption{\centering{Histograma dos tempos de espera}}\label{fig:hist wait}
+        \includegraphics[width=\textwidth]{hist waiting.png}
+        \caption*{Fonte: Autoria própria}
+    \end{minipage}
+\end{figure}
+
+Visualmente, parece que existem pelo menos dois \textit{clusters} bem divididos nos histogramas. Isso será melhor avaliado com o ajuste dos modelos.
+
+\begin{figure}[H]
+    \centering
+    \begin{minipage}{0.45\textwidth}
+        \caption{\centering{Boxplot da duração das erupções}}\label{fig:boxplot erupt}
+        \includegraphics[width=\textwidth]{boxplot eruptions.png}
+        \caption*{Fonte: Autoria própria}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.45\textwidth}
+        \centering
+        \caption{\centering{Boxplot dos tempos de espera}}\label{fig:boxplot wait}
+        \includegraphics[width=\textwidth]{boxplot waiting.png}
+        \caption*{Fonte: Autoria própria}
+    \end{minipage}
+\end{figure}
+
+Antes de partir para tal etapa, foi investigada a presença de \textit{outliers}. Como é notado pelos boxplots das figuras \ref{fig:boxplot erupt} e \ref{fig:boxplot wait}, bem como por meio da implementação de uma função para a regra da amplitude interquartil (\ref{IQR}), não foram detectados ruídos nos dados.
+
+\subsection{Ajuste dos Modelos}
+
+\
+
+Para o ajuste, foi utilizada a função \texttt{Mclust} da biblioteca com os argumentos padrões. Desse modo, a própria função escolhe qual a quantidade de \textit{clusters} ideal de acordo com o BIC. Nesse sentido, o melhor modelo encontrado foi o modelo com três \textit{clusters} e os seguintes parâmetros:
+
+\begin{table}[H]
+    \begin{minipage}{0.55\textwidth}
+        \centering
+        \begin{tabular}{c|ccc}
+        \hline
+        \textit{Cluster $i$} & \textit{1} & \textit{2} & \textit{3} \\
+        \hline
+        N° de obs. $n$ & 40 & 97 & 135 \\
+        Peso $w_i$  & 16.57\% & 35.64\% & 47.79\% \\
+        Média $\mu_{i_\text{erupções}}$ & 3.79 & 2.04 & 4.46 \\
+        Média $\mu_{i_\text{espera}}$ & 77.52 & 54.49 & 80.83 \\
+        \hline
+        \end{tabular}
+        \caption{Sumário do melhor trimodal}\label{summary1}
+    \end{minipage}%
+    \begin{minipage}{0.55\textwidth}
+        \centering
+        \begin{tabular}{c|cc}
+        {} & \textit{Erupções} & \textit{Espera} \\
+        \hline
+        \textit{Erupções} & 0.07825448 & 0.4801979 \\
+        \textit{Espera} & 0.48019785 & 33.7671464 \\
+        \hline
+        \
+        \end{tabular}
+        \caption{\centering{Covariâncias do modelo trimodal}}\label{cov1}
+    \end{minipage}%
+\end{table}
+
+É importante pontuar que este é um modelo bivariado ($D = 2$), por isso a diferenciação entre $\mu_{i_\text{erupções}}$ e $\mu_{i_\text{espera}}$. Assim, os resultados das tabelas \ref{summary1} e \ref{cov1} expressam o modelo de mistura multivariado que o pacote \texttt{mclust} nomeia de \textit{"EEE"}: elipsoidal, com volumes, formas e orientações iguais. Ou seja, ele assume que a distribuição dos dados nos diferentes clusters é bastante homogênea, sem grandes variações na dispersão ou orientação dos dados. Isso também se reflete na matriz de covariância ser a mesma para todos os grupos. Porém, parece ser uma conjectura ingênua.
+
+Pode-se, então, analisar visualmente a divisão assumida pelo modelo:
+
+\begin{figure}[H]
+    \centering
+    \begin{minipage}{0.45\textwidth}
+        \centering
+        \caption{Clusterização pelo Modelo de Mistura Gaussiana - 3 \textit{clusters}}\label{fig:3clustscatter}
+        \includegraphics[width=\textwidth]{scatter 3 clusters.png}
+        \caption*{Fonte: Autoria própria}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.45\textwidth}
+        \centering
+        \caption{Histograma das esperas por \textit{cluster}}\label{fig:3clusthist}
+        \includegraphics[width=\textwidth]{hist 3 clusters.png}
+        \caption*{Fonte: Autoria própria}
+    \end{minipage}
+\end{figure}
+
+Observando-se as figuras \ref{fig:3clustscatter} e \ref{fig:3clusthist}, parece bastante contraintuitiva a assunção de três clusters. Isso ocorre devido ao único critério da função \texttt{Mclust} ser o valor do BIC. Entretanto, a literatura — \cite{azzalini1990look}, \cite{bryan2008geysers}, \cite{scrucca2016identifying} — sugere fortemente que os dados do Old Faithful possuem uma distribuição bimodal, e não trimodal como indicam os resultados anteriores. Dessa maneira, foi realizado outro ajuste, desta vez forçando a função a realizá-lo com dois grupos ao fornecer os argumentos. A seguir, apresenta-se a sumarização dos resultados encontrados:
+
+
+\begin{table}[H]
+        \centering
+        \begin{tabular}{c|cc}
+        \hline
+        \textit{Cluster $i$} & \textit{1} & \textit{2} \\
+        \hline
+        N° de obs. $n$ & 175 & 97 \\
+        Peso $w_i$  & 64.32\% & 35.68\% \\
+        Média $\mu_{i_\text{erupções}}$ & 4.29 & 2.04 \\
+        Média $\mu_{i_\text{espera}}$ & 79.99 & 54.51 \\
+        \hline
+        \end{tabular}
+        \caption{Sumário do modelo bimodal}\label{summary2}
+\end{table}
+
+\begin{table}[H]
+    \begin{minipage}{0.55\textwidth}
+        \centering
+        \begin{tabular}{c|cc}
+        {} & \textit{Erupções} & \textit{Espera} \\
+        \hline
+        \textit{Erupções} & 0.1600175 & 0.7272673 \\
+        \textit{Espera} & 0.7272673 & 35.7585543 \\
+        \hline
+        \
+        \end{tabular}
+        \caption{\centering{Covariâncias do modelo bimodal - \textit{Cluster 1}}}\label{cov21}
+    \end{minipage}%
+    \begin{minipage}{0.55\textwidth}
+        \centering
+        \begin{tabular}{c|cc}
+        {} & \textit{Erupções} & \textit{Espera} \\
+        \hline
+        \textit{Erupções} & 0.08069286 & 0.6912995 \\
+        \textit{Espera} & 0.69129952 & 33.9186657 \\
+        \hline
+        \
+        \end{tabular}
+        \caption{\centering{Covariâncias do modelo bimodal - \textit{Cluster 2}}}\label{cov22}
+    \end{minipage}%
+\end{table}
+
+\begin{figure}[H]
+    \centering
+    \begin{minipage}{0.45\textwidth}
+        \caption{\centering{Clusterização pelo Modelo de Mistura Gaussiana - 2 \textit{clusters}}}\label{fig:2clustscatter}
+        \includegraphics[width=\textwidth]{scatter 2 clusters.png}
+        \caption*{Fonte: Autoria própria}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.45\textwidth}
+        \caption{\centering{Histograma das esperas por \textit{cluster}}}\label{fig:2clusthist}
+        \includegraphics[width=\textwidth]{hist 2 clusters.png}
+        \caption*{Fonte: Autoria própria}
+    \end{minipage}
+\end{figure}
+
+As tabelas e figuras acima apresentam o resumo e visualização do modelo bimodal encontrado para este caso, que o pacote nomeia de \textit{VVE}: elipsoidal, com volume e formas variáveis e igual orientação. Ou seja, as matrizes de covariância para as componentes têm volumes e formas diferentes, mas compartilham a mesma orientação, como representado nas tabelas \ref{cov21} e \ref{cov22}. É notável pelas figuras \ref{fig:3clustscatter} e \ref{fig:3clusthist} a melhor adequação dos dados aos seus respectivos \textit{clusters}, respeitando os picos de cada distribuição. 
+
+Não obstante, uma melhor análise é realizada numéricamente com os coeficientes mencionados na metodologia na próxima seção.
+
+
+\subsection{Validação dos modelos}
+
+Para validar os modelos ajustados, foram utilizados diversos critérios de validação, incluindo o Critério de Informação Bayesiano (\ref{BIC}), o Critério de Verossimilhança de Dados Completos Integrados (\ref{ICL}) e a pontuação de silhueta (\ref{silhouette}) . A seguir, apresenta-se um resumo dessas medidas para cada modelo:
+
+\begin{table}[H]
+        \centering
+        \begin{tabular}{c|cc}
+        \hline
+        \textit{Modelo} & \textit{EEE} & \textit{VVE} \\
+        \hline
+        BIC  & -2314.316 & -2320.433 \\
+        ICL & -2357.824 & -2320.763 \\
+        Silhueta & 0.298 & 0.710 \\
+        \hline
+        \end{tabular}
+        \caption{Medidas de ajuste dos modelos}\label{fitting}
+\end{table}
+
+Como expresso na tabela \ref{fitting}, os valores do BIC indicam a qualidade do ajuste dos modelos, penalizando a complexidade do modelo para evitar sobreajuste. Como dito anteriormente, a função \texttt{Mclust} toma como referência o melhor BIC dentre todos os modelos possíveis. Entretanto, ao observar os valores de ICL pela função \texttt{mclustICL}, ela retorna o seguinte resultado:
+
+\begin{verbatim}
+Top 3 models based on the ICL criterion: 
+    VVE,2     VVV,2     VEE,2 
+-2320.763 -2322.697 -2323.396 
+\end{verbatim}
+
+Esses resultados indicam que, de acordo com o ICL, o modelo \textit{VVE} com 2 clusters é o melhor, seguido pelos modelos \textit{VVV} e \textit{VEE}, ambos com 2 clusters. Isso sugere que o modelo \textit{VVE} fornece a melhor estrutura de clusters, penalizando tanto a complexidade do modelo quanto a incerteza na atribuição dos dados aos clusters.
+
+Dessa forma, o modelo trimodal apresentou um melhor valor de BIC, indicando um melhor ajuste de acordo com esse critério. Apesar disso, o ICL e a pontuação de silhueta foram significativamente melhores para o modelo bimodal, sugerindo que os clusters formados são mais distintos e bem definidos nesse modelo.
+
+A análise visual e a literatura existente também apoiam a ideia de que o modelo bimodal é mais adequado para os dados do Old Faithful, capturando de forma mais fiel as duas populações subjacentes.
+
+Portanto, apesar do modelo trimodal ter um BIC melhor, a combinação de validação quantitativa (ICL e silhueta) e a validação qualitativa (análise visual e literatura) favorecem o modelo bimodal como a melhor representação dos dados do Old Faithful.
+
+
+\subsection{Análise da Convergência do Algoritmo EM}
+
+\
+
+Para avaliar a convergência do algoritmo EM nos modelos \textit{EEE} e \textit{VVE}, foi necessário registrar a log-verossimilhança em cada iteração do ajuste, pois o pacote \texttt{mclust} não fornece seu histórico diretamente. Isso foi feito adaptando o ajuste do modelo para permitir o controle do número de iterações do algoritmo e registrando a log-verossimilhança a cada passo.
+
+A Figura \ref{convergencia} mostra a convergência da log-verossimilhança para os modelos \textit{EEE} e \textit{VVE}. O comportamento da log-verossimilhança ao longo das iterações indica como o algoritmo EM está se ajustando aos dados e se estabilizando em um valor final, sugerindo convergência com menos de 20 iterações para ambos os modelos.
+
+\begin{figure}[H]
+\centering
+\caption{Convergência da Log-Verossimilhança pelo Algoritmo EM}\label{convergencia}
+\includegraphics[width=0.5\textwidth]{convergence.png}
+\end{figure}
+
+\section{Conclusão}
+
+\
+
+Neste trabalho, foram ajustados modelos de mistura de gaussianas (GMMs) aos dados do gêiser Old Faithful utilizando a biblioteca \texttt{mclust}. Inicialmente, o modelo escolhido pelo critério de informação bayesiano (BIC) foi um modelo trimodal (\textit{EEE}), indicando três clusters.
+
+Entretanto, ao considerar outras métricas de validação, como o Critério de Verossimilhança de Dados Completos Integrados (ICL) e a pontuação de silhueta, o modelo bimodal (\textit{VVE}), dois clusters, mostrou-se superior.
+
+O modelo bimodal apresentou melhores valores de ICL e pontuação de silhueta, sugerindo que os clusters formados são mais distintos e bem definidos. A análise visual e a literatura existente também corroboram a ideia de que um modelo bimodal é mais apropriado para os dados do Old Faithful, capturando de forma mais fiel as duas populações subjacentes.
+
+Para avaliar a convergência do algoritmo EM, foi registrado o valor da log-verossimilhança a cada iteração para os modelos \textit{EEE} e \textit{VVE}. O comportamento da log-verossimilhança ao longo das iterações demonstrou que ambos os modelos alcançaram a convergência, com a estabilização dos valores de log-verossimilhança após poucas iterações.
+
+Durante o desenvolvimento deste trabalho, algumas dificuldades foram encontradas, especialmente em relação à implementação e análise da convergência do algoritmo EM. A obtenção do histórico das iterações do EM não é trivial e exigiu adaptações manuais nos ajustes dos modelos.
+
+Uma extensão natural deste trabalho seria a aplicação da metodologia a conjuntos de dados mais complexos, com maior dimensionalidade e possível presença de outliers. Além disso, a implementação de técnicas de inicialização melhoradas para o algoritmo EM, como \textit{K-means++} ou métodos baseados em redes neurais, pode aumentar a eficiência e robustez do ajuste dos modelos.
+
+Outra linha de pesquisa seria a comparação entre diferentes algoritmos de ajuste de modelos de mistura, como a otimização estocástica ou métodos de Monte Carlo via Cadeias de Markov (MCMC), que podem oferecer interpretações adicionais sobre a convergência e a estabilidade dos modelos ajustados.
+
+Em resumo, este trabalho demonstrou a eficácia dos modelos de mistura de gaussianas na captura da estrutura de dados do gêiser Old Faithful, ressaltando a importância de múltiplas métricas de validação para uma análise robusta. A continuidade deste estudo pode proporcionar avanços significativos na modelagem estatística e compreensão de fenômenos naturais.
+
+
+\newpage
+
+\bibliographystyle{plainnat} 
+\bibliography{biblio}
+\end{document}

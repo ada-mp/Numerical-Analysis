@@ -1,2 +1,2 @@
 # Numerical-Analysis
-Assignments of the Numerical Analysis discipline, attended in the 1st semester of 2024
+Assignments of the Numerical Analysis course, attended in the 1st semester of 2024
